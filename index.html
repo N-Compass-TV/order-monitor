@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Monitoring Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .cell-menu {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            min-width: 150px;
+        }
+        .cell-menu.show {
+            display: block;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .columns-menu {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            min-width: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .columns-menu.show {
+            display: block;
+        }
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="w-full">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">Order Monitoring Dashboard</h1>
+        
+        <!-- Tab Navigation -->
+        <div class="mb-6 border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8">
+                <button id="orders-tab" class="tab-button active border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600">
+                    Orders
+                </button>
+                <button id="expected-tab" class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    Expected Orders
+                </button>
+                <button id="stores-tab" class="tab-button border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    Store Branches
+                </button>
+            </nav>
+        </div>
+
+        <!-- Orders Table Container -->
+        <div id="orders-container" class="tab-content">
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-4 border-b border-gray-200 flex gap-2">
+                    <input 
+                        type="text" 
+                        id="expected-search" 
+                        placeholder="Search expected orders..." 
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                    <select 
+                        id="expected-status-filter"
+                        class="pl-4 pr-10 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white appearance-none cursor-pointer"
+                        style="background-image: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%236B7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E'); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em;"
+                        onchange="handleExpectedStatusFilterChange()"
+                    >
+                        <option value="all">All Status</option>
+                        <option value="did-not-receive">Did Not Receive</option>
+                        <option value="received-on-time">Received | On Time</option>
+                        <option value="received-late">Received | Late</option>
+                    </select>
+                    <button 
+                        id="expected-columns-btn"
+                        class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+                        onclick="toggleColumnsMenu('expected', event)"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+                        </svg>
+                        Columns
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead id="expected-thead" class="bg-gray-50"></thead>
+                        <tbody id="expected-tbody" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+                <div id="expected-pagination" class="px-4 py-3 bg-gray-50 border-t border-gray-200 sm:px-6"></div>
+            </div>
+        </div>
+
+        <!-- Expected Orders Table Container -->
+        <div id="expected-container" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-4 border-b border-gray-200 flex gap-2">
+                    <input 
+                        type="text" 
+                        id="orders-search" 
+                        placeholder="Search orders..." 
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                    <select 
+                        id="orders-status-filter"
+                        class="pl-4 pr-10 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white appearance-none cursor-pointer"
+                        style="background-image: url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 fill=%27none%27 viewBox=%270 0 20 20%27%3E%3Cpath stroke=%27%236B7280%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27 stroke-width=%271.5%27 d=%27M6 8l4 4 4-4%27/%3E%3C/svg%3E'); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em;"
+                        onchange="handleStatusFilterChange()"
+                    >
+                        <option value="all">All Status</option>
+                        <option value="on-time">On Time</option>
+                        <option value="late">Late</option>
+                        <option value="unknown">Unknown</option>
+                    </select>
+                    <button 
+                        id="orders-columns-btn"
+                        class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+                        onclick="toggleColumnsMenu('orders', event)"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+                        </svg>
+                        Columns
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead id="orders-thead" class="bg-gray-50"></thead>
+                        <tbody id="orders-tbody" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+                <div id="orders-pagination" class="px-4 py-3 bg-gray-50 border-t border-gray-200 sm:px-6"></div>
+            </div>
+        </div>
+
+        <!-- Store Branches Table Container -->
+        <div id="stores-container" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow">
+                <div class="p-4 border-b border-gray-200 flex gap-2">
+                    <input 
+                        type="text" 
+                        id="stores-search" 
+                        placeholder="Search stores..." 
+                        class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                    <button 
+                        id="stores-columns-btn"
+                        class="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50 flex items-center gap-2"
+                        onclick="toggleColumnsMenu('stores', event)"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+                        </svg>
+                        Columns
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead id="stores-thead" class="bg-gray-50"></thead>
+                        <tbody id="stores-tbody" class="bg-white divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+                <div id="stores-pagination" class="px-4 py-3 bg-gray-50 border-t border-gray-200 sm:px-6"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase configuration
+        const SUPABASE_URL = 'https://mzcrggogbmvfwbfrgarc.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16Y3JnZ29nYm12ZndiZnJnYXJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzMjg2NzcsImV4cCI6MjA3NzkwNDY3N30.sgGEiNuM3sqSZfSTVMWAeMR-IpbJk7pdqdFFsufd4Sw';
+        
+        // Initialize Supabase client
+        let supabaseClient;
+        if (window.supabase) {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } else {
+            console.error('Supabase library not loaded');
+            alert('Failed to load Supabase library. Please refresh the page.');
+        }
+        
+        // State management
+        let ordersData = [];
+        let storesData = [];
+        let expectedOrdersData = [];
+        let currentTab = 'orders';
+        
+        // Pagination state
+        const pagination = {
+            expected: { currentPage: 1, itemsPerPage: 25, sortColumn: null, sortDirection: 'asc' },
+            orders: { currentPage: 1, itemsPerPage: 25, sortColumn: null, sortDirection: 'asc' },
+            stores: { currentPage: 1, itemsPerPage: 25, sortColumn: null, sortDirection: 'asc' }
+        };
+        
+        // Filter state
+        const filters = {
+            expected: { status: 'all' },
+            orders: { orderStatus: 'all' },
+            stores: {}
+        };
+        
+        // Column visibility state
+        const columnVisibility = {
+            expected: {},
+            orders: {},
+            stores: {}
+        };
+
+        // Load data from Supabase
+        async function loadData() {
+            try {
+                // Show loading state with spinner
+                const loadingHTML = '<tr><td colspan="100" class="text-center py-12"><div class="flex flex-col items-center gap-3"><div class="spinner"></div><p class="text-gray-500 text-sm">Loading data...</p></div></td></tr>';
+                document.getElementById('expected-tbody').innerHTML = loadingHTML;
+                document.getElementById('orders-tbody').innerHTML = loadingHTML;
+                document.getElementById('stores-tbody').innerHTML = loadingHTML;
+                
+                // Load orders from Supabase
+                const { data: orders, error: ordersError } = await supabaseClient
+                    .from('orders')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (ordersError) {
+                    throw new Error('Failed to load orders: ' + ordersError.message);
+                }
+                
+                ordersData = orders || [];
+                
+                // Add computed order status column
+                ordersData = ordersData.map(order => {
+                    return {
+                        ...order,
+                        order_status: calculateOrderStatus(order)
+                    };
+                });
+
+                // Load store branches from Supabase
+                const { data: stores, error: storesError } = await supabaseClient
+                    .from('store_branches')
+                    .select('*')
+                    .order('store_name', { ascending: true });
+                
+                if (storesError) {
+                    throw new Error('Failed to load stores: ' + storesError.message);
+                }
+                
+                storesData = stores || [];
+
+                // Calculate expected orders for current week
+                expectedOrdersData = calculateExpectedOrders();
+
+                // Reset column visibility to apply new defaults
+                columnVisibility.expected = {};
+                columnVisibility.orders = {};
+
+                // Render all tables to clear loading spinners
+                renderTable('orders');
+                renderTable('expected');
+                renderTable('stores');
+            } catch (error) {
+                console.error('Error loading data:', error);
+                alert('Failed to load data from Supabase: ' + error.message);
+                document.getElementById('orders-tbody').innerHTML = '<tr><td colspan="100" class="text-center py-8 text-red-500">Error loading data</td></tr>';
+                document.getElementById('stores-tbody').innerHTML = '<tr><td colspan="100" class="text-center py-8 text-red-500">Error loading data</td></tr>';
+            }
+        }
+
+        // Render table
+        function renderTable(type) {
+            let data;
+            if (type === 'expected') {
+                data = expectedOrdersData;
+            } else if (type === 'orders') {
+                data = ordersData;
+            } else {
+                data = storesData;
+            }
+            const state = pagination[type];
+            const thead = document.getElementById(`${type}-thead`);
+            const tbody = document.getElementById(`${type}-tbody`);
+            const searchInput = document.getElementById(`${type}-search`);
+
+            // Filter data based on search
+            let filteredData = data.filter(row => {
+                const searchTerm = searchInput.value.toLowerCase();
+                const matchesSearch = Object.values(row).some(val => 
+                    String(val).toLowerCase().includes(searchTerm)
+                );
+                
+                // Apply expected status filter
+                if (type === 'expected' && filters.expected.status !== 'all') {
+                    const statusFilter = filters.expected.status;
+                    const expectedStatus = row.expectation_status;
+                    
+                    if (statusFilter === 'did-not-receive' && expectedStatus !== 'Did Not Receive') {
+                        return false;
+                    }
+                    if (statusFilter === 'received-on-time' && expectedStatus !== 'Received | On Time') {
+                        return false;
+                    }
+                    if (statusFilter === 'received-late' && expectedStatus !== 'Received | Late') {
+                        return false;
+                    }
+                }
+                
+                // Apply order status filter for orders table
+                if (type === 'orders' && filters.orders.orderStatus !== 'all') {
+                    const statusFilter = filters.orders.orderStatus;
+                    const orderStatus = row.order_status;
+                    
+                    if (statusFilter === 'on-time' && orderStatus !== 'On Time') {
+                        return false;
+                    }
+                    if (statusFilter === 'late' && orderStatus !== 'Late') {
+                        return false;
+                    }
+                    if (statusFilter === 'unknown' && orderStatus !== 'Unknown') {
+                        return false;
+                    }
+                }
+                
+                return matchesSearch;
+            });
+
+            // Sort data
+            if (state.sortColumn) {
+                filteredData.sort((a, b) => {
+                    const aVal = String(a[state.sortColumn] || '');
+                    const bVal = String(b[state.sortColumn] || '');
+                    const comparison = aVal.localeCompare(bVal);
+                    return state.sortDirection === 'asc' ? comparison : -comparison;
+                });
+            }
+
+            // Paginate
+            const totalPages = Math.ceil(filteredData.length / state.itemsPerPage);
+            const start = (state.currentPage - 1) * state.itemsPerPage;
+            const paginatedData = filteredData.slice(start, start + state.itemsPerPage);
+
+            // Render header
+            if (data.length > 0) {
+                const headers = Object.keys(data[0]);
+                
+                // Initialize column visibility for this table if not exists
+                if (!columnVisibility[type] || Object.keys(columnVisibility[type]).length === 0) {
+                    headers.forEach(header => {
+                        // Hide specific columns by default for expected orders table
+                        if (type === 'expected' && ['id'].includes(header)) {
+                            columnVisibility[type][header] = false;
+                        }
+                        // Hide specific columns by default for orders table
+                        else if (type === 'orders' && ['id', 'card_id', 'store_id', 'card_title', 'status'].includes(header)) {
+                            columnVisibility[type][header] = false;
+                        }
+                        // Hide specific columns by default for stores table
+                        else if (type === 'stores' && ['id', 'store_id', 'metadata', 'is_active', 'created_at', 'updated_at', 'share_group_id'].includes(header)) {
+                            columnVisibility[type][header] = false;
+                        } else {
+                            columnVisibility[type][header] = true;
+                        }
+                    });
+                } else {
+                    // For expected orders, ensure new columns get proper defaults even if visibility object exists
+                    headers.forEach(header => {
+                        if (columnVisibility[type][header] === undefined) {
+                            if (type === 'expected' && ['id'].includes(header)) {
+                                columnVisibility[type][header] = false;
+                            } else if (type === 'orders' && ['id', 'card_id', 'store_id', 'card_title', 'status'].includes(header)) {
+                                columnVisibility[type][header] = false;
+                            } else if (type === 'stores' && ['id', 'store_id', 'metadata', 'is_active', 'created_at', 'updated_at', 'share_group_id'].includes(header)) {
+                                columnVisibility[type][header] = false;
+                            } else {
+                                columnVisibility[type][header] = true;
+                            }
+                        }
+                    });
+                }
+                
+                // Filter visible headers
+                const visibleHeaders = headers.filter(h => columnVisibility[type][h]);
+                
+                thead.innerHTML = '';
+                const headerRow = document.createElement('tr');
+                
+                headers.forEach(header => {
+                    const isVisible = columnVisibility[type][header];
+                    if (!isVisible) return; // Skip hidden columns
+                    
+                    const th = document.createElement('th');
+                    th.className = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hover:bg-gray-100 sticky top-0 bg-gray-50';
+                    
+                    const headerDiv = document.createElement('div');
+                    headerDiv.className = 'flex items-center justify-between gap-2';
+                    
+                    const sortDiv = document.createElement('div');
+                    sortDiv.className = 'flex items-center cursor-pointer flex-1';
+                    sortDiv.onclick = () => sortTable(type, header);
+                    sortDiv.innerHTML = `
+                        ${header}
+                        ${state.sortColumn === header ? 
+                            (state.sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}
+                    `;
+                    
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.className = 'p-1 hover:bg-gray-200 rounded opacity-50 hover:opacity-100 flex-shrink-0';
+                    toggleBtn.title = 'Hide column';
+                    toggleBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        toggleColumnVisibility(type, header);
+                    };
+                    toggleBtn.innerHTML = `
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                    `;
+                    
+                    headerDiv.appendChild(sortDiv);
+                    headerDiv.appendChild(toggleBtn);
+                    th.appendChild(headerDiv);
+                    headerRow.appendChild(th);
+                });
+                
+                thead.appendChild(headerRow);
+
+                // Render body
+                tbody.innerHTML = '';
+                paginatedData.forEach((row, rowIndex) => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50';
+                    
+                    headers.forEach(header => {
+                        if (!columnVisibility[type][header]) return; // Skip hidden columns
+                        
+                        const td = document.createElement('td');
+                        td.className = 'px-4 py-3 text-sm text-gray-900 relative group';
+                        
+                        const div = document.createElement('div');
+                        div.className = 'flex items-center justify-between';
+                        
+                        const span = document.createElement('span');
+                        span.className = 'truncate max-w-xs';
+                        const cellValue = row[header];
+                        let displayValue = '';
+                        if (cellValue === null || cellValue === undefined) {
+                            displayValue = '';
+                        } else if (typeof cellValue === 'object') {
+                            displayValue = JSON.stringify(cellValue);
+                        } else {
+                            displayValue = String(cellValue);
+                        }
+                        
+                        // Special styling for order_status column
+                        if (header === 'order_status') {
+                            if (cellValue === 'Late') {
+                                span.className = 'px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-800';
+                                span.textContent = 'Received | Late';
+                            } else if (cellValue === 'On Time') {
+                                span.className = 'px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800';
+                                span.textContent = 'Received | On Time';
+                            } else {
+                                span.className = 'px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-800';
+                                span.textContent = cellValue;
+                            }
+                        } else if (header === 'expectation_status') {
+                            // Special styling for expectation_status column
+                            if (cellValue === 'Did Not Receive') {
+                                span.className = 'px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-800';
+                            } else if (cellValue === 'Received | On Time') {
+                                span.className = 'px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800';
+                            } else if (cellValue === 'Received | Late') {
+                                span.className = 'px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-800';
+                            } else {
+                                span.className = 'px-2 py-1 rounded text-xs font-semibold bg-gray-100 text-gray-800';
+                            }
+                            span.textContent = cellValue;
+                        } else {
+                            span.textContent = truncateText(displayValue, 20);
+                        }
+                        
+                        const button = document.createElement('button');
+                        button.className = 'opacity-0 group-hover:opacity-100 ml-2 p-1 hover:bg-gray-100 rounded flex-shrink-0';
+                        button.innerHTML = `
+                            <svg class="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                            </svg>
+                        `;
+                        button.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const cellValue = row[header];
+                            let valueToStore = '';
+                            if (cellValue === null || cellValue === undefined) {
+                                valueToStore = '';
+                            } else if (typeof cellValue === 'object') {
+                                valueToStore = JSON.stringify(cellValue, null, 2);
+                            } else {
+                                valueToStore = String(cellValue);
+                            }
+                            showCellMenu(e, valueToStore);
+                        });
+                        
+                        div.appendChild(span);
+                        div.appendChild(button);
+                        td.appendChild(div);
+                        tr.appendChild(td);
+                    });
+                    
+                    tbody.appendChild(tr);
+                });
+
+                // Render pagination
+                renderPagination(type, totalPages, filteredData.length);
+            }
+        }
+
+        // Sort table
+        function sortTable(type, column) {
+            const state = pagination[type];
+            if (state.sortColumn === column) {
+                state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                state.sortColumn = column;
+                state.sortDirection = 'asc';
+            }
+            renderTable(type);
+        }
+        
+        // Toggle column visibility
+        function toggleColumnVisibility(type, column) {
+            columnVisibility[type][column] = !columnVisibility[type][column];
+            renderTable(type);
+        }
+        
+        // Toggle columns menu
+        function toggleColumnsMenu(type, event) {
+            event.stopPropagation();
+            
+            // Remove existing menu
+            const existingMenu = document.querySelector('.columns-menu');
+            if (existingMenu) {
+                existingMenu.remove();
+                return;
+            }
+            
+            let data;
+            if (type === 'expected') {
+                data = expectedOrdersData;
+            } else if (type === 'orders') {
+                data = ordersData;
+            } else {
+                data = storesData;
+            }
+            if (data.length === 0) return;
+            
+            const headers = Object.keys(data[0]);
+            const button = event.currentTarget;
+            const rect = button.getBoundingClientRect();
+            
+            const menu = document.createElement('div');
+            menu.className = 'columns-menu show';
+            
+            // Position menu - align right edge with button if too close to right edge
+            const menuWidth = 200; // min-width from CSS
+            const spaceOnRight = window.innerWidth - rect.right;
+            
+            if (spaceOnRight < menuWidth) {
+                // Align right edge of menu with right edge of button
+                menu.style.right = (window.innerWidth - rect.right) + 'px';
+            } else {
+                // Align left edge of menu with left edge of button
+                menu.style.left = rect.left + 'px';
+            }
+            
+            menu.style.top = (rect.bottom + 5) + 'px';
+            
+            const hiddenCount = headers.filter(h => !columnVisibility[type][h]).length;
+            
+            menu.innerHTML = `
+                <div class="p-2 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase">
+                    Toggle Columns ${hiddenCount > 0 ? `(${hiddenCount} hidden)` : ''}
+                </div>
+                ${headers.map(header => {
+                    const isVisible = columnVisibility[type][header];
+                    return `
+                        <label class="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                ${isVisible ? 'checked' : ''}
+                                onchange="toggleColumnVisibility('${type}', '${header}')"
+                                class="mr-2"
+                            >
+                            <span class="text-sm ${isVisible ? 'text-gray-900' : 'text-gray-400'}">${header}</span>
+                        </label>
+                    `;
+                }).join('')}
+            `;
+            
+            menu.onclick = (e) => e.stopPropagation();
+            document.body.appendChild(menu);
+        }
+        
+        // Close columns menu
+        function closeColumnsMenu() {
+            const menu = document.querySelector('.columns-menu');
+            if (menu) {
+                menu.remove();
+            }
+        }
+
+        // Render pagination
+        function renderPagination(type, totalPages, totalItems) {
+            const state = pagination[type];
+            const container = document.getElementById(`${type}-pagination`);
+            
+            const start = (state.currentPage - 1) * state.itemsPerPage + 1;
+            const end = Math.min(state.currentPage * state.itemsPerPage, totalItems);
+
+            container.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-gray-700">
+                        Showing <span class="font-medium">${start}</span> to <span class="font-medium">${end}</span> of <span class="font-medium">${totalItems}</span> results
+                    </div>
+                    <div class="flex space-x-2">
+                        <button 
+                            onclick="changePage('${type}', ${state.currentPage - 1})"
+                            ${state.currentPage === 1 ? 'disabled' : ''}
+                            class="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium ${state.currentPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}"
+                        >
+                            Previous
+                        </button>
+                        <span class="px-3 py-1 text-sm text-gray-700">
+                            Page ${state.currentPage} of ${totalPages}
+                        </span>
+                        <button 
+                            onclick="changePage('${type}', ${state.currentPage + 1})"
+                            ${state.currentPage === totalPages ? 'disabled' : ''}
+                            class="px-3 py-1 border border-gray-300 rounded-md text-sm font-medium ${state.currentPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Change page
+        function changePage(type, page) {
+            const state = pagination[type];
+            const data = type === 'orders' ? ordersData : storesData;
+            const totalPages = Math.ceil(data.length / state.itemsPerPage);
+            
+            if (page >= 1 && page <= totalPages) {
+                state.currentPage = page;
+                renderTable(type);
+            }
+        }
+
+        // Calculate expected orders for current week
+        function calculateExpectedOrders() {
+            const currentWeek = getCurrentWeekFolder();
+            const previousWeek = getPreviousWeekFolder(currentWeek);
+            
+            return storesData
+                .filter(store => store.is_active)
+                .map(store => {
+                    const duration = store.display_duration_days || 7;
+                    
+                    // For bi-weekly stores, check if they ordered last week
+                    if (duration === 14) {
+                        const hasRecentOrder = ordersData.some(order => 
+                            order.store_code === store.store_code && 
+                            order.week_folder === previousWeek
+                        );
+                        
+                        if (hasRecentOrder) {
+                            // Skip this store, they're covered by last week's order
+                            return null;
+                        }
+                    }
+                    
+                    // Check if there's an order for this week
+                    const orderThisWeek = ordersData.find(order => 
+                        order.store_code === store.store_code && 
+                        order.week_folder === currentWeek
+                    );
+                    
+                    let expectation_status = 'Did Not Receive';
+                    let order_received_date = null;
+                    
+                    if (orderThisWeek) {
+                        order_received_date = orderThisWeek.created_at;
+                        
+                        // Calculate if it was on time or late
+                        const deadline = calculateDeadlineDate(currentWeek, store.expected_order_receive_day);
+                        const receivedDate = new Date(orderThisWeek.created_at);
+                        
+                        if (receivedDate <= deadline) {
+                            expectation_status = 'Received | On Time';
+                        } else {
+                            expectation_status = 'Received | Late';
+                        }
+                    } else {
+                        // Check if deadline has passed
+                        const deadline = calculateDeadlineDate(currentWeek, store.expected_order_receive_day);
+                        const now = new Date();
+                        
+                        if (now <= deadline) {
+                            expectation_status = 'Did Not Receive';
+                        } else {
+                            expectation_status = 'Did Not Receive';
+                        }
+                    }
+                    
+                    return {
+                        store_code: store.store_code,
+                        store_name: store.store_name,
+                        expected_receive_day: store.expected_order_receive_day,
+                        display_duration: duration + ' days',
+                        week_folder: currentWeek,
+                        order_received_date: order_received_date,
+                        expectation_status: expectation_status,
+                        id: store.id  // Include id so we can hide it by default
+                    };
+                })
+                .filter(item => item !== null);
+        }
+        
+        // Get current week folder (YYYY-Www format)
+        function getCurrentWeekFolder() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const oneJan = new Date(year, 0, 1);
+            const days = Math.floor((now - oneJan) / (24 * 60 * 60 * 1000));
+            const weekNum = Math.ceil((days + oneJan.getDay() + 1) / 7);
+            return `${year}-W${String(weekNum).padStart(2, '0')}`;
+        }
+        
+        // Get previous week folder
+        function getPreviousWeekFolder(currentWeek) {
+            const [year, weekStr] = currentWeek.split('-W');
+            let weekNum = parseInt(weekStr);
+            let yearNum = parseInt(year);
+            
+            weekNum--;
+            if (weekNum < 1) {
+                yearNum--;
+                weekNum = 52; // Approximate, good enough for this use case
+            }
+            
+            return `${yearNum}-W${String(weekNum).padStart(2, '0')}`;
+        }
+        
+        // Calculate deadline date for a given week and day
+        function calculateDeadlineDate(weekFolder, expectedDay) {
+            if (!expectedDay) return new Date(); // If no expected day, return current date
+            
+            const [year, weekStr] = weekFolder.split('-W');
+            const weekNum = parseInt(weekStr);
+            
+            // Get the Monday of that week
+            const jan4 = new Date(year, 0, 4);
+            const weekOneMonday = new Date(jan4);
+            weekOneMonday.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1);
+            const targetMonday = new Date(weekOneMonday);
+            targetMonday.setDate(weekOneMonday.getDate() + (weekNum - 1) * 7);
+            
+            // Map day names to offset from Monday
+            const dayMap = {
+                'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+                'friday': 4, 'saturday': 5, 'sunday': 6
+            };
+            
+            const dayOffset = dayMap[expectedDay.toLowerCase()] || 0;
+            const deadlineDate = new Date(targetMonday);
+            deadlineDate.setDate(targetMonday.getDate() + dayOffset);
+            deadlineDate.setHours(23, 59, 59, 999);
+            
+            return deadlineDate;
+        }
+        
+        // Calculate order status based on deadline
+        function calculateOrderStatus(order) {
+            try {
+                // Parse metadata to get start_day
+                const metadata = typeof order.metadata === 'string' ? JSON.parse(order.metadata) : order.metadata;
+                const startDay = metadata?.start_day;
+                
+                if (!startDay || !order.created_at || !order.week_folder) {
+                    return 'Unknown';
+                }
+                
+                // Map day names to numbers (0 = Monday, 6 = Sunday)
+                const dayMap = {
+                    'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+                    'friday': 4, 'saturday': 5, 'sunday': 6
+                };
+                
+                const startDayNum = dayMap[startDay.toLowerCase()];
+                if (startDayNum === undefined) return 'Unknown';
+                
+                // Calculate deadline (3 days before start_day)
+                let deadlineDayNum = startDayNum - 3;
+                if (deadlineDayNum < 0) deadlineDayNum += 7; // wrap around to previous week
+                
+                // Parse week_folder (format: YYYY-Wnn)
+                const [year, weekStr] = order.week_folder.split('-W');
+                const weekNum = parseInt(weekStr);
+                
+                // Get the Monday of that week
+                const jan4 = new Date(year, 0, 4);
+                const weekOneMonday = new Date(jan4);
+                weekOneMonday.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1);
+                const targetMonday = new Date(weekOneMonday);
+                targetMonday.setDate(weekOneMonday.getDate() + (weekNum - 1) * 7);
+                
+                // Calculate the deadline date
+                const deadlineDate = new Date(targetMonday);
+                deadlineDate.setDate(targetMonday.getDate() + deadlineDayNum);
+                deadlineDate.setHours(23, 59, 59, 999); // End of deadline day
+                
+                // Parse created_at date
+                const createdDate = new Date(order.created_at);
+                
+                // Compare dates
+                return createdDate <= deadlineDate ? 'On Time' : 'Late';
+            } catch (error) {
+                console.error('Error calculating order status:', error);
+                return 'Unknown';
+            }
+        }
+        
+        // Truncate text
+        function truncateText(text, maxLength) {
+            if (text.length <= maxLength) return text;
+            return text.substring(0, maxLength) + '...';
+        }
+
+        // Tab switching
+        document.getElementById('expected-tab').addEventListener('click', () => {
+            switchTab('expected');
+        });
+        
+        document.getElementById('orders-tab').addEventListener('click', () => {
+            switchTab('orders');
+        });
+
+        document.getElementById('stores-tab').addEventListener('click', () => {
+            switchTab('stores');
+        });
+
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active', 'border-blue-500', 'text-blue-600');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            document.getElementById(`${tab}-tab`).classList.add('active', 'border-blue-500', 'text-blue-600');
+            document.getElementById(`${tab}-tab`).classList.remove('border-transparent', 'text-gray-500');
+            
+            // Update content visibility
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            document.getElementById(`${tab}-container`).classList.remove('hidden');
+            
+            renderTable(tab);
+        }
+
+        // Handle expected status filter change
+        function handleExpectedStatusFilterChange() {
+            const filterValue = document.getElementById('expected-status-filter').value;
+            filters.expected.status = filterValue;
+            pagination.expected.currentPage = 1;
+            renderTable('expected');
+        }
+        
+        // Handle status filter change
+        function handleStatusFilterChange() {
+            const filterValue = document.getElementById('orders-status-filter').value;
+            filters.orders.orderStatus = filterValue;
+            pagination.orders.currentPage = 1;
+            renderTable('orders');
+        }
+        
+        // Search functionality
+        document.getElementById('expected-search').addEventListener('input', () => {
+            pagination.expected.currentPage = 1;
+            renderTable('expected');
+        });
+        
+        document.getElementById('orders-search').addEventListener('input', () => {
+            pagination.orders.currentPage = 1;
+            renderTable('orders');
+        });
+
+        document.getElementById('stores-search').addEventListener('input', () => {
+            pagination.stores.currentPage = 1;
+            renderTable('stores');
+        });
+
+        // Cell menu functionality
+        let currentCellValue = '';
+        
+        function showCellMenu(event, value) {
+            event.stopPropagation();
+            currentCellValue = value;
+            
+            // Remove existing menu
+            const existingMenu = document.querySelector('.cell-menu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+            
+            // Create new menu
+            const menu = document.createElement('div');
+            menu.className = 'cell-menu show';
+            menu.style.left = event.pageX + 'px';
+            menu.style.top = event.pageY + 'px';
+            menu.innerHTML = `
+                <button onclick="copyCellValue()" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                    Copy Cell
+                </button>
+                <button onclick="viewCellValue()" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                    View Cell
+                </button>
+            `;
+            
+            document.body.appendChild(menu);
+        }
+        
+        function copyCellValue() {
+            navigator.clipboard.writeText(currentCellValue).then(() => {
+                // Show success feedback
+                const menu = document.querySelector('.cell-menu');
+                if (menu) {
+                    const btn = menu.querySelector('button:first-child');
+                    btn.innerHTML = `
+                        <svg class="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span class="text-green-600">Copied!</span>
+                    `;
+                    setTimeout(() => {
+                        closeCellMenu();
+                    }, 500);
+                }
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
+        
+        function viewCellValue() {
+            closeCellMenu();
+            
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'modal show';
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4" onclick="event.stopPropagation()">
+                    <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">Cell Content</h3>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="p-6">
+                        <pre class="bg-gray-50 p-4 rounded border border-gray-200 overflow-auto max-h-96 text-sm">${escapeHtml(currentCellValue)}</pre>
+                    </div>
+                    <div class="flex items-center justify-end gap-2 p-4 border-t border-gray-200">
+                        <button onclick="copyCellValueFromModal()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                            Copy
+                        </button>
+                        <button onclick="closeModal()" class="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            modal.onclick = closeModal;
+            document.body.appendChild(modal);
+        }
+        
+        function copyCellValueFromModal() {
+            navigator.clipboard.writeText(currentCellValue).then(() => {
+                const btn = document.querySelector('.modal button:first-of-type');
+                if (btn) {
+                    btn.innerHTML = `
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Copied!
+                    `;
+                    setTimeout(() => {
+                        closeModal();
+                    }, 500);
+                }
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
+        
+        function closeCellMenu() {
+            const menu = document.querySelector('.cell-menu');
+            if (menu) {
+                menu.remove();
+            }
+        }
+        
+        function closeModal() {
+            const modal = document.querySelector('.modal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Close menus when clicking outside
+        document.addEventListener('click', () => {
+            closeCellMenu();
+            closeColumnsMenu();
+        });
+
+        // Initialize
+        loadData();
+    </script>
+</body>
+</html>

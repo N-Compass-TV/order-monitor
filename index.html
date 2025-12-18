@@ -480,8 +480,8 @@
                         span.className = 'truncate max-w-xs';
                         const cellValue = row[header];
                         let displayValue = '';
-                        if (cellValue === null || cellValue === undefined) {
-                            displayValue = '';
+                        if (cellValue === null || cellValue === undefined || cellValue === '') {
+                            displayValue = '--';
                         } else if (typeof cellValue === 'object') {
                             displayValue = JSON.stringify(cellValue);
                         } else {

@@ -1,31 +1,6 @@
-# Order Monitoring Dashboard
+# Order Monitoring Dashboard - User Guide
 
-A web-based dashboard for monitoring store orders and tracking submission timeliness. The dashboard connects to Supabase and provides real-time order tracking with automated status calculations.
-
-## Features
-
-- **Three-tab interface**: Orders, Expected Orders, and Store Branches
-- **Real-time data** from Supabase
-- **Automated status tracking** for order timeliness
-- **Search, sort, and filter** functionality
-- **Column visibility toggles** for customized views
-- **Pagination** (25 items per page)
-- **Cell actions**: Copy and view full content
-- **Loading indicators** for better UX
-
-## Setup
-
-1. Clone the repository
-2. Open `index.html` in a web browser
-3. The dashboard will automatically connect to Supabase and load data
-
-### Supabase Configuration
-
-The dashboard connects to the following Supabase instance:
-- **URL**: `https://mzcrggogbmvfwbfrgarc.supabase.co`
-- **Tables**: `orders`, `store_branches`
-
-The Supabase credentials are embedded in the `index.html` file.
+A web-based dashboard for monitoring store orders and tracking submission timeliness. This guide explains how to use the dashboard and understand the order statuses.
 
 ## Tab Overview
 
@@ -200,56 +175,56 @@ Both use the Monday of the week specified in `week_folder` as the reference poin
 
 ---
 
-## Usage Tips
+## How to Use the Dashboard
 
-1. **Default View**: The dashboard opens to the Orders tab by default
-2. **Column Management**: Use the "Columns" button to show/hide specific columns
-3. **Search**: The search box filters across all visible columns
-4. **Sorting**: Click column headers to sort (click again to reverse)
-5. **Cell Details**: Hover over cells and click the "..." button to copy or view full content
-6. **Filters**: Use status filter dropdowns to focus on specific order states
+### Navigation
+
+The dashboard has three tabs at the top:
+1. **Orders** - View all submitted orders (default view)
+2. **Expected Orders** - See which stores should submit this week
+3. **Store Branches** - Reference list of all stores and their settings
+
+Click any tab to switch between views.
+
+### Search and Filter
+
+- **Search Box**: Type to search across all visible columns (store names, codes, dates, etc.)
+- **Status Filter Dropdown**: Filter by order status (On Time, Late, Did Not Receive, etc.)
+- **Results Update**: Search and filters update the table in real-time
+
+### Sorting
+
+- Click any column header to sort by that column
+- Click again to reverse the sort order (ascending ↑ / descending ↓)
+- The arrow indicator shows current sort direction
+
+### Column Management
+
+- Click the **"Columns"** button (top right) to show/hide specific columns
+- Eye icon (👁) next to each column header also hides that column
+- Checkbox list shows all available columns and which are currently visible
+- Customize your view by hiding columns you don't need
+
+### Viewing Cell Details
+
+- Hover over any cell to see the **"..."** menu button
+- Click the menu to access:
+  - **Copy Cell**: Copy the cell content to clipboard
+  - **View Cell**: Open a modal to see the full content (useful for long text or JSON data)
+
+### Pagination
+
+- The table shows 25 items per page
+- Use **Previous** and **Next** buttons at the bottom to navigate pages
+- Current page number and total pages are displayed between the buttons
+
+### Refreshing Data
+
+- Reload the browser page to fetch the latest data from the database
+- The dashboard shows a loading spinner while data is being fetched
 
 ---
 
-## Technical Details
+## Need Help?
 
-- **Framework**: Vanilla JavaScript with Tailwind CSS
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Anonymous key (read-only access)
-- **Pagination**: Client-side, 25 items per page
-- **Refresh**: Reload the page to fetch latest data
-
----
-
-## Data Requirements
-
-### Orders Table Schema
-- `id` (bigint): Auto-increment ID
-- `order_id` (uuid): Unique order identifier
-- `store_code` (text): Store identifier
-- `store_name` (text): Store name
-- `metadata` (json): Must contain `start_day` field
-- `created_at` (timestamp): Order submission time
-- `week_folder` (text): Week identifier in `YYYY-Wnn` format
-
-### Store Branches Table Schema
-- `id` (uuid): Unique store ID
-- `store_code` (text): Store identifier
-- `store_name` (text): Store name
-- `is_active` (boolean): Whether store is active
-- `display_duration_days` (integer): 7 or 14
-- `expected_order_receive_day` (text): Day name (e.g., "monday")
-- `display_start_day` (text): Display period start day
-- `display_end_day` (text): Display period end day
-
----
-
-## Contributing
-
-This dashboard is maintained by the N-Compass TV team. For questions or issues, please contact the development team.
-
----
-
-## License
-
-Proprietary - N-Compass TV
+For questions or issues with the dashboard, contact the N-Compass TV development team.

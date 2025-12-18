@@ -239,6 +239,13 @@
             orders: {},
             stores: {}
         };
+        
+        // Row selection state for highlighting
+        const selectedRows = {
+            expected: new Set(),
+            orders: new Set(),
+            stores: new Set()
+        };
 
         // Load data from Supabase
         async function loadData() {
@@ -420,6 +427,12 @@
                 thead.innerHTML = '';
                 const headerRow = document.createElement('tr');
                 
+                // Add checkbox header
+                const checkboxTh = document.createElement('th');
+                checkboxTh.className = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 w-12';
+                checkboxTh.innerHTML = '<input type="checkbox" class="rounded" onclick="toggleAllRows(\'' + type + '\')" id="' + type + '-select-all">';
+                headerRow.appendChild(checkboxTh);
+                
                 headers.forEach(header => {
                     const isVisible = columnVisibility[type][header];
                     if (!isVisible) return; // Skip hidden columns
@@ -464,8 +477,24 @@
                 // Render body
                 tbody.innerHTML = '';
                 paginatedData.forEach((row, rowIndex) => {
+                    const actualIndex = start + rowIndex;
+                    const rowId = actualIndex;
+                    const isSelected = selectedRows[type].has(rowId);
+                    
                     const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-gray-50';
+                    tr.className = isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50';
+                    tr.dataset.rowId = rowId;
+                    
+                    // Add checkbox cell
+                    const checkboxTd = document.createElement('td');
+                    checkboxTd.className = 'px-4 py-3 text-sm w-12';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.className = 'rounded cursor-pointer';
+                    checkbox.checked = isSelected;
+                    checkbox.onchange = () => toggleRowSelection(type, rowId);
+                    checkboxTd.appendChild(checkbox);
+                    tr.appendChild(checkboxTd);
                     
                     headers.forEach(header => {
                         if (!columnVisibility[type][header]) return; // Skip hidden columns
@@ -873,6 +902,37 @@
         function truncateText(text, maxLength) {
             if (text.length <= maxLength) return text;
             return text.substring(0, maxLength) + '...';
+        }
+        
+        // Toggle single row selection
+        function toggleRowSelection(type, rowId) {
+            if (selectedRows[type].has(rowId)) {
+                selectedRows[type].delete(rowId);
+            } else {
+                selectedRows[type].add(rowId);
+            }
+            renderTable(type);
+        }
+        
+        // Toggle all rows on current page
+        function toggleAllRows(type) {
+            const selectAllCheckbox = document.getElementById(`${type}-select-all`);
+            const state = pagination[type];
+            const start = (state.currentPage - 1) * state.itemsPerPage;
+            const end = start + state.itemsPerPage;
+            
+            if (selectAllCheckbox.checked) {
+                // Select all rows on current page
+                for (let i = start; i < end; i++) {
+                    selectedRows[type].add(i);
+                }
+            } else {
+                // Deselect all rows on current page
+                for (let i = start; i < end; i++) {
+                    selectedRows[type].delete(i);
+                }
+            }
+            renderTable(type);
         }
 
         // Tab switching

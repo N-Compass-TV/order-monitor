@@ -260,14 +260,6 @@
                 }
                 
                 ordersData = orders || [];
-                
-                // Add computed order status column
-                ordersData = ordersData.map(order => {
-                    return {
-                        ...order,
-                        order_status: calculateOrderStatus(order)
-                    };
-                });
 
                 // Load store branches from Supabase
                 const { data: stores, error: storesError } = await supabaseClient
@@ -280,6 +272,17 @@
                 }
                 
                 storesData = stores || [];
+
+                // Enrich orders data with store branch info and computed status
+                ordersData = ordersData.map(order => {
+                    const store = storesData.find(s => s.store_code === order.store_code);
+                    return {
+                        ...order,
+                        order_status: calculateOrderStatus(order),
+                        display_start_day: store?.display_start_day || null,
+                        display_end_day: store?.display_end_day || null
+                    };
+                });
 
                 // Calculate expected orders for current week
                 expectedOrdersData = calculateExpectedOrders();
